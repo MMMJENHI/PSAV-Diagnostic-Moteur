@@ -3,3 +3,6 @@ scipy
 tensorflow
 streamlit
 matplotlib
+
+
+git remote add origin https://github.com/MMMJENHI/PSAV-Diagnostic-Moteur/PSAV-Diagnostic-Moteur.git
