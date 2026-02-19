@@ -1,51 +1,81 @@
-# --- ETAPE 2 : Source des données ---
-st.sidebar.title("Source des donnees")
-source = st.sidebar.radio("Choisir la source :", ("Mon Ordinateur", "Exemples du projet (GitHub)"))
+import streamlit as st
+import os
+import pandas as pd
+import numpy as np
+import tensorflow as tf
+
+st.set_page_config(page_title="Diagnostic Moteur", layout="wide")
+
+# --- FONCTION DE RECHERCHE AUTOMATIQUE ---
+def trouver_chemin(nom_dossier):
+    # On cherche le dossier dans le répertoire courant et les sous-répertoires
+    for root, dirs, files in os.walk("."):
+        if nom_dossier in dirs:
+            return os.path.join(root, nom_dossier)
+    return None
+
+# Localisation des dossiers
+chemin_data = trouver_chemin("data")
+chemin_models = trouver_chemin("models")
+
+# --- BARRE LATÉRALE ---
+st.sidebar.title("🔍 État du Système")
+
+# 1. Chargement du Modèle
+model_file = None
+if chemin_models:
+    model_file = os.path.join(chemin_models, "vibration_model.h5")
+    if os.path.exists(model_file):
+        try:
+            @st.cache_resource
+            def load_model():
+                return tf.keras.models.load_model(model_file)
+            model = load_model()
+            st.sidebar.success("✅ IA : Modèle chargé")
+        except Exception as e:
+            st.sidebar.error("Erreur de lecture du .h5")
+    else:
+        st.sidebar.warning("⚠️ Fichier .h5 introuvable dans /models")
+else:
+    st.sidebar.error("❌ Dossier /models introuvable")
+
+# 2. Gestion des données
+st.sidebar.divider()
+source = st.sidebar.radio("Source :", ("Mon Ordinateur", "GitHub (Dossier Data)"))
 
 file_to_process = None
-data_path_on_disk = None
 
 if source == "Mon Ordinateur":
-    uploaded_file = st.file_uploader("Charger un fichier", type=["wav", "csv"])
-    if uploaded_file is not None:
-        file_to_process = uploaded_file
+    file_to_process = st.file_uploader("Charger un CSV", type=["csv"])
 else:
-    # On définit le dossier (vérifie bien s'il faut 'data' ou 'Data')
-    target_dir = "data" 
-    
-    if os.path.exists(target_dir):
-        test_files = [f for f in os.listdir(target_dir) if f.endswith(('.wav', '.csv'))]
-        if test_files:
-            selected_test = st.selectbox("Choisir un fichier de test :", test_files)
-            data_path_on_disk = os.path.join(target_dir, selected_test)
-            file_to_process = data_path_on_disk
+    if chemin_data:
+        fichiers = [f for f in os.listdir(chemin_data) if f.endswith('.csv')]
+        if fichiers:
+            choix = st.sidebar.selectbox("Choisir un exemple :", fichiers)
+            file_to_process = os.path.join(chemin_data, choix)
+            st.sidebar.success(f"Fichier trouvé : {choix}")
         else:
-            st.error(f"Le dossier '{target_dir}' est vide sur GitHub.")
+            st.sidebar.error("Le dossier 'data' est vide sur GitHub.")
     else:
-        st.error(f"Dossier '{target_dir}' introuvable sur GitHub.")
+        st.sidebar.error("❌ Dossier 'data' introuvable")
 
-# --- ETAPE 3 : Traitement ---
-if file_to_process is not None:
-    st.divider()
-    
-    # Lecture des données réelles (CSV ou WAV)
+# --- CORPS DE L'APPLICATION ---
+st.title("🚀 Diagnostic Vibratoire Moteur")
+
+if file_to_process:
     try:
-        if source == "Mon Ordinateur":
-            # Si c'est un upload
-            df = pd.read_csv(file_to_process)
-        else:
-            # Si c'est un fichier du dossier data
-            df = pd.read_csv(data_path_on_disk)
-        
-        # On extrait le signal (on suppose que c'est la 1ère colonne)
+        df = pd.read_csv(file_to_process)
         signal = df.iloc[:, 0].values
-        st.success("✅ Données chargées avec succès depuis le fichier.")
+        
+        st.subheader("Analyse du Signal")
+        st.line_chart(signal[:1000])
+        
+        # Ici tu peux ajouter tes prédictions model.predict(signal)
+        st.success("Analyse terminée avec succès.")
     except Exception as e:
-        st.warning("Lecture directe impossible, utilisation d'un signal simulé.")
-        t = np.linspace(0, 1, 1000)
-        signal = np.sin(2 * np.pi * 50 * t) + 0.3 * np.random.randn(1000)
-
-    # Affichage des graphiques (le reste de ton code ne change pas)
-    st.subheader("1. Signal Vibratoire (Temporel)")
-    st.line_chart(signal)
-    # ... (le reste de ta FFT ici)
+        st.error(f"Erreur lors de l'analyse : {e}")
+else:
+    st.info("Sélectionnez une donnée pour démarrer l'analyse.")
+    # Debug pour t'aider : affiche ce que le serveur voit réellement
+    with st.expander("DEBUG : Structure du serveur"):
+        st.write("Dossiers présents :", os.listdir("."))
