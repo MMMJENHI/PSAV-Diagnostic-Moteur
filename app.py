@@ -1,27 +1,44 @@
-import streamlit as st
-import os
-import pandas as pd
-import numpy as np
-import tensorflow as tf
+# --- APRÈS LE CHARGEMENT DU MODÈLE ---
 
-# 1. On définit où se trouve le dossier du projet
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+if df is not None:
+    st.divider()
+    st.subheader("📊 Analyse du Signal Vibratoire")
+    
+    # 1. Affichage du graphique
+    # On suppose que la première colonne contient les vibrations
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.line_chart(df.iloc[:1000, 0]) # Affiche les 1000 premiers points
+        st.caption("Signal temporel des vibrations (accéléromètre)")
 
-# 2. On crée le chemin vers ton fichier .h5 (le nom exact que nous avons trouvé)
-CHEMIN_MODELE = os.path.join(BASE_DIR, "models", "expert_vibration_tensorflow.h5")
+    with col2:
+        st.write("🔍 **Statistiques du signal :**")
+        st.write(f"Moyenne : {df.iloc[:,0].mean():.4f}")
+        st.write(f"Max (Crête) : {df.iloc[:,0].max():.4f}")
 
-# 3. On demande à Python de charger le cerveau de l'IA
-if os.path.exists(CHEMIN_MODELE):
+    # 2. Lancement du Diagnostic par l'IA
+    st.divider()
+    st.subheader("🧠 Verdict du Système Expert")
+    
+    # On prépare la donnée pour le modèle (souvent un tableau de 1000 points)
     try:
-        # Cette fonction charge le modèle une seule fois pour ne pas ralentir l'app
-        @st.cache_resource
-        def load_my_model():
-            return tf.keras.models.load_model(CHEMIN_MODELE)
+        # On redimensionne pour correspondre à l'entrée du réseau de neurones
+        input_data = df.iloc[:1000, 0].values.reshape(1, 1000, 1)
         
-        model = load_my_model()
-        st.sidebar.success("✅ IA : Modèle chargé avec succès")
+        # L'IA fait sa prédiction
+        prediction = model.predict(input_data)
+        probabilite = prediction[0][0]
+
+        if probabilite > 0.5:
+            st.error(f"🚨 ALERTE : ANOMALIE DÉTECTÉE ({probabilite:.2%})")
+            st.info("💡 **Diagnostic :** Usure probable des roulements ou balourd détecté.")
+        else:
+            st.success(f"✅ ÉTAT NORMAL ({1 - probabilite:.2%})")
+            st.info("💡 **Diagnostic :** Le moteur fonctionne dans les plages de tolérance.")
+            
     except Exception as e:
-        st.sidebar.error(f"Erreur technique lors du chargement : {e}")
+        st.warning("⚠️ Format de données : Assurez-vous que le CSV contient au moins 1000 lignes.")
 else:
-    # Si le chemin est faux, ce message s'affichera
-    st.sidebar.warning(f"⚠️ Fichier introuvable à l'adresse : {CHEMIN_MODELE}")
+    # Ce message s'affiche tant qu'aucun fichier n'est choisi
+    st.info("👈 Veuillez sélectionner un fichier dans la barre latérale pour lancer l'analyse.")
