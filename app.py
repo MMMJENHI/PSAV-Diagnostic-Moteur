@@ -1,44 +1,72 @@
-# --- APRÈS LE CHARGEMENT DU MODÈLE ---
+import streamlit as st
+import os
+import pandas as pd
+import numpy as np
+import tensorflow as tf
 
-if df is not None:
-    st.divider()
-    st.subheader("📊 Analyse du Signal Vibratoire")
-    
-    # 1. Affichage du graphique
-    # On suppose que la première colonne contient les vibrations
-    col1, col2 = st.columns([2, 1])
-    
-    with col1:
-        st.line_chart(df.iloc[:1000, 0]) # Affiche les 1000 premiers points
-        st.caption("Signal temporel des vibrations (accéléromètre)")
+# --- 1. CONFIGURATION ET INITIALISATION ---
+st.set_page_config(page_title="Diagnostic Vibratoire", layout="wide")
+st.title("🚜 Système Expert : Diagnostic Moteur")
 
-    with col2:
-        st.write("🔍 **Statistiques du signal :**")
-        st.write(f"Moyenne : {df.iloc[:,0].mean():.4f}")
-        st.write(f"Max (Crête) : {df.iloc[:,0].max():.4f}")
+# On définit les variables pour éviter les "NameError"
+df = None
+model = None
 
-    # 2. Lancement du Diagnostic par l'IA
-    st.divider()
-    st.subheader("🧠 Verdict du Système Expert")
-    
-    # On prépare la donnée pour le modèle (souvent un tableau de 1000 points)
-    try:
-        # On redimensionne pour correspondre à l'entrée du réseau de neurones
-        input_data = df.iloc[:1000, 0].values.reshape(1, 1000, 1)
-        
-        # L'IA fait sa prédiction
-        prediction = model.predict(input_data)
-        probabilite = prediction[0][0]
+# --- 2. GESTION DES CHEMINS ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+MODEL_PATH = os.path.join(BASE_DIR, "models", "expert_vibration_tensorflow.h5")
+DATA_DIR = os.path.join(BASE_DIR, "data")
 
-        if probabilite > 0.5:
-            st.error(f"🚨 ALERTE : ANOMALIE DÉTECTÉE ({probabilite:.2%})")
-            st.info("💡 **Diagnostic :** Usure probable des roulements ou balourd détecté.")
-        else:
-            st.success(f"✅ ÉTAT NORMAL ({1 - probabilite:.2%})")
-            st.info("💡 **Diagnostic :** Le moteur fonctionne dans les plages de tolérance.")
-            
-    except Exception as e:
-        st.warning("⚠️ Format de données : Assurez-vous que le CSV contient au moins 1000 lignes.")
+# --- 3. CHARGEMENT DU MODÈLE ---
+@st.cache_resource
+def load_my_model():
+    if os.path.exists(MODEL_PATH):
+        return tf.keras.models.load_model(MODEL_PATH)
+    return None
+
+model = load_my_model()
+
+# Barre latérale
+st.sidebar.header("⚙️ Paramètres")
+if model:
+    st.sidebar.success("✅ Modèle IA chargé")
 else:
-    # Ce message s'affiche tant qu'aucun fichier n'est choisi
-    st.info("👈 Veuillez sélectionner un fichier dans la barre latérale pour lancer l'analyse.")
+    st.sidebar.error("❌ Modèle IA introuvable")
+
+# --- 4. CHARGEMENT DES DONNÉES ---
+st.sidebar.subheader("Sélection des données")
+source = st.sidebar.radio("Source :", ["Exemples du projet", "Télécharger un CSV"])
+
+if source == "Exemples du projet":
+    if os.path.exists(DATA_DIR):
+        files = [f for f in os.listdir(DATA_DIR) if f.endswith('.csv')]
+        if files:
+            selected = st.sidebar.selectbox("Fichier :", files)
+            df = pd.read_csv(os.path.join(DATA_DIR, selected))
+else:
+    uploaded = st.sidebar.file_uploader("Fichier CSV", type="csv")
+    if uploaded:
+        df = pd.read_csv(uploaded)
+
+# --- 5. AFFICHAGE ET ANALYSE ---
+if df is not None:
+    st.subheader("📊 Visualisation du Signal")
+    # On affiche les 1000 premières lignes de la 1ère colonne
+    st.line_chart(df.iloc[:1000, 0])
+    
+    if model:
+        st.subheader("🧠 Résultat du Diagnostic")
+        # On prépare la donnée pour le modèle
+        try:
+            sample = df.iloc[:1000, 0].values.reshape(1, 1000, 1)
+            prediction = model.predict(sample)
+            score = prediction[0][0]
+            
+            if score > 0.5:
+                st.error(f"🚨 ANOMALIE DÉTECTÉE (Probabilité : {score:.2%})")
+            else:
+                st.success(f"✅ MOTEUR SAIN (Confiance : {1-score:.2%})")
+        except Exception as e:
+            st.info("Signal chargé. Prêt pour l'analyse manuelle.")
+else:
+    st.info("👋 Bienvenue ! Veuillez choisir un fichier CSV dans le menu à gauche pour commencer l'analyse.")
