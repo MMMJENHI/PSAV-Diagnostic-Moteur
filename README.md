@@ -30,3 +30,4 @@ L'application suit un pipeline de données rigoureux :
 
 ## 👷 Auteur
 * **MMMJENHI** - *Développement et Intégration IA*
+* [![Open in Streamlit](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://psav-diagnostic-moteur-ub6ipaiwh8pjytbjaz5pdf.streamlit.app/)
